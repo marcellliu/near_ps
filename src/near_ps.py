@@ -6,6 +6,7 @@ import numpy as np
 import numpy.matlib
 import gc
 
+
 class Near_Ps(object):
     """docstring for Near_Ps."""
 
@@ -22,8 +23,9 @@ class Near_Ps(object):
                           0, 4097.97886076197, 903.583728699309], [0, 0, 1]])
         self.lambda_ = 0
         self.shadows = True
-        self.I = np.ones((8, 3, 3, 3))
-        self.Phi = np.array([[54229968.5201271],[40943902.7144921],[39176492.0197441],[34748554.9936707],[43119457.2127401],[39409192.5974319],[47548583.0849450],[32084397.6480282]])
+        self.I = np.random.rand(8, 3, 3, 3)
+        self.Phi = np.array([[54229968.5201271], [40943902.7144921], [39176492.0197441], [34748554.9936707], [
+                            43119457.2127401], [39409192.5974319], [47548583.0849450], [32084397.6480282]])
 
     def main_function(self):
         fx = self.K[0][0]
@@ -33,22 +35,22 @@ class Near_Ps(object):
 
         if(self.nchannels == 1):
             for i in range(self.nimgs):
-                self.I[i] = self.I[i]/self.Phi[i]
+                self.I[i] = self.I[i] / self.Phi[i]
         else:
             if(self.Phi.shape[1] == 1):
-                self.Phi = np.hstack((self.Phi,self.Phi,self.Phi))
+                self.Phi = np.hstack((self.Phi, self.Phi, self.Phi))
             for i in range(self.nimgs):
                 for ch in range(self.nchannels):
-                    self.I[i,ch] = self.I[i,ch]/self.Phi[i,ch]
+                    self.I[i, ch] = self.I[i, ch] / self.Phi[i, ch]
 
         max_I = np.amax(self.I)
-        self.I = self.I/max_I
+        self.I = self.I / max_I
 
         # Scaled pixel units
         uu, vv = np.meshgrid(range(self.ncols), range(self.nrows))
-        u_tilde = (uu-x0)
-        v_tilde = (vv-y0)
-        del x0,y0,uu,vv
+        u_tilde = (uu - x0)
+        v_tilde = (vv - y0)
+        del x0, y0, uu, vv
         gc.collect()
 
         # Use a bounding box
@@ -57,45 +59,57 @@ class Near_Ps(object):
         imax = max(imask[0])
         jmin = min(imask[1])
         jmax = max(imask[1])
-        self.z = self.z[imin:imax+1,jmin:jmax+1]
-        u_tilde = u_tilde[imin:imax+1,jmin:jmax+1]
-        v_tilde = v_tilde[imin:imax+1,jmin:jmax+1]
-        self.I= self.I[:,:,imin:imax+1,jmin:jmax+1]
-        self.mask = self.mask[imin:imax+1,jmin:jmax+1]
+        self.z = self.z[imin:imax + 1, jmin:jmax + 1]
+        u_tilde = u_tilde[imin:imax + 1, jmin:jmax + 1]
+        v_tilde = v_tilde[imin:imax + 1, jmin:jmax + 1]
+        self.I = self.I[:, :, imin:imax + 1, jmin:jmax + 1]
+        self.mask = self.mask[imin:imax + 1, jmin:jmax + 1]
         imask = np.where(self.mask > 0)
         npix = len(imask[0])
         self.nrows = self.mask.shape[0]
         self.ncols = self.mask.shape[1]
-        del imin,imax,jmin,jmax
+        del imin, imax, jmin, jmax
         gc.collect()
 
         # Some useful variables
-        px_rep = np.matlib.repmat(u_tilde[imask],1,self.nimgs)
-        py_rep = np.matlib.repmat(v_tilde[imask],1,self.nimgs)
+        px_rep = np.matlib.repmat(u_tilde[imask], 1, self.nimgs)
+        py_rep = np.matlib.repmat(v_tilde[imask], 1, self.nimgs)
         # Dx_rep = np.matlib.repmat(u_tilde[imask],self.nimgs,1)
         # Dy_rep = np.matlib.repmat(u_tilde[imask],self.nimgs,1)
 
         # Vectorize data
-        self.I = self.I.reshape((self.nimgs,self.nchannels,self.nrows*self.ncols))
-        self.I = np.swapaxes(self.I,0,1)
-        self.I = self.I[:,:,[imask[0]*self.ncols+imask[1]]]
+        self.I = self.I.reshape(
+            (self.nimgs, self.nchannels, self.nrows * self.ncols))
+        self.I = np.swapaxes(self.I, 0, 1)
+        self.I = self.I[:, :, [imask[0] * self.ncols + imask[1]]]
+        self.I = self.I.reshape((self.nimgs, self.nchannels, -1))
+        self.I = np.swapaxes(self.I, 0, 1)
+
         # Sort images to remove shadows and highlights
+        self.sort_linear_index(self.I, 1, "descend")
+        W_idx = np.zeros(self.I.shape)
+        # W_idx(:, indices, : ) = 1
+        # W_idx(:) = W_idx(J(: ))
 
     def test(self):
         # imask = np.where(self.mask > 0)
         # index_matrix = np.zeros([3, 3])
         # index_matrix[imask] = range(1, len(imask[0]) + 1)
         # # print index_matrix
-        a = np.array([[1, 2],[ 3, 4]])
-        self.mask[:,0]=0
-        self.mask[1,1] =0
-        self.z = np.ones((10, 10))*70
+        a = np.array([[1, 2], [3, 4]])
+        self.mask[:, 0] = 0
+        self.mask[1, 1] = 0
+        self.z = np.ones((10, 10)) * 70
         self.main_function()
 
     def make_gradient(self):
         Dyp, Dym, Dxp, Dxm = self.graddient_operators()
         Dy = Dyp
         # no_bottom =
+        #
+        #
+        #
+        #
 
     def graddient_operators(self):
         self.nrows = self.mask.shape[0]
@@ -245,7 +259,15 @@ class Near_Ps(object):
 
     def sort_linear_index(sef, A, sortDim, sortOrder):
         sizeA = A.shape
-        # np.Sort
+        if (sortOrder == "descend"):
+            sortIndex = -np.argsort(-A, axis=sortDim)
+
+        else:
+            sortIndex = np.argsort(A, axis=sortDim)
+        print sortIndex
+        return sortIndex
+
+        # print np.sort(A,axis = sortDim)
 
 
 if __name__ == "__main__":
