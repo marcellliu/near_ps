@@ -18,7 +18,7 @@ class Near_Ps(object):
         self.ncols = self.mask.shape[1]
         self.nchannels = 3
         self.nimgs = 8
-        self.z = 0
+        z = 0
         self.K = np.array([[4092.66394448750, 0, 1244.12180883431], [
                           0, 4097.97886076197, 903.583728699309], [0, 0, 1]])
         self.lambda_ = 0
@@ -28,11 +28,13 @@ class Near_Ps(object):
                             43119457.2127401], [39409192.5974319], [47548583.0849450], [32084397.6480282]])
 
     def main_function(self):
+        z = np.ones((10, 10)) * 70
+        # Intrinsics
         fx = self.K[0][0]
         fy = self.K[1][1]
         x0 = self.K[0][2]
         y0 = self.K[1][2]
-
+        # Divide images by lighting intensities and normalize to [0,1]
         if(self.nchannels == 1):
             for i in range(self.nimgs):
                 self.I[i] = self.I[i] / self.Phi[i]
@@ -59,7 +61,7 @@ class Near_Ps(object):
         imax = max(imask[0])
         jmin = min(imask[1])
         jmax = max(imask[1])
-        self.z = self.z[imin:imax + 1, jmin:jmax + 1]
+        z = z[imin:imax + 1, jmin:jmax + 1]
         u_tilde = u_tilde[imin:imax + 1, jmin:jmax + 1]
         v_tilde = v_tilde[imin:imax + 1, jmin:jmax + 1]
         self.I = self.I[:, :, imin:imax + 1, jmin:jmax + 1]
@@ -78,29 +80,52 @@ class Near_Ps(object):
         # Dy_rep = np.matlib.repmat(u_tilde[imask],self.nimgs,1)
 
         # Vectorize data
+        self.I = self.I[:, :, imask[0], imask[1]]
         self.I = self.I.reshape(
-            (self.nimgs, self.nchannels, self.nrows * self.ncols))
-        self.I = np.swapaxes(self.I, 0, 1)
-        self.I = self.I[:, :, [imask[0] * self.ncols + imask[1]]]
-        self.I = self.I.reshape((self.nimgs, self.nchannels, -1))
+            (self.nimgs, self.nchannels, -1))
         self.I = np.swapaxes(self.I, 0, 1)
 
         # Sort images to remove shadows and highlights
-        self.sort_linear_index(self.I, 1, "descend")
-        W_idx = np.zeros(self.I.shape)
-        # W_idx(:, indices, : ) = 1
-        # W_idx(:) = W_idx(J(: ))
+        W_idx = self.sort_linear_index(1, "descend")
+
+        #########################################
+        # Initialize variables
+        z[self.mask == 0] = np.nan
+        z_tilde = np.log(z[imask])
+        rho = np.ones([self.nrows, self.ncols, self.nchannels]) / max_I
+        XYZ = np.array([[z * u_tilde], [z * v_tilde], [z]])
+        # zx = Dx*z_tilde
+        # zy = Dy*z_tilde
+        Nx = np.zeros([self.nrows, self.ncols])
+        Ny = np.zeros([self.nrows, self.ncols])
+        Nz = np.zeros([self.nrows, self.ncols])
+        # Nx(imask) = fx*zx
+        # Ny(imask) = fx*zx
+        # Nz[imask] = -u_tilde[imask]*zx-v_tilde[imask]*zy-1
+        # dz = np.sqrt(Nx*Nx+Ny*Ny+Nz*Nz)
+        # N = [[Nx/dz],[Ny/dz],[Nz/dz]]
+        # rho_tilde = rho/[[dz],[dz],[dz]].reshape((self.nrows*self.ncols,self.nchannels))
+        # rho_tilde = rho_tilde[:,imask]
+        # tab_nrj = []
+
+        #########################################
+        # Initial energy
+        
 
     def test(self):
         # imask = np.where(self.mask > 0)
         # index_matrix = np.zeros([3, 3])
         # index_matrix[imask] = range(1, len(imask[0]) + 1)
         # # print index_matrix
-        a = np.array([[1, 2], [3, 4]])
+
         self.mask[:, 0] = 0
         self.mask[1, 1] = 0
-        self.z = np.ones((10, 10)) * 70
+
         self.main_function()
+
+        a = np.array([[1, 2, 3], [1, 2, 3], [1, 2, 3]])
+        b = np.array([[2, 4, 6], [2, 4, 6], [2, 4, 6]])
+        print b / a
 
     def make_gradient(self):
         Dyp, Dym, Dxp, Dxm = self.graddient_operators()
@@ -181,6 +206,23 @@ class Near_Ps(object):
         Dum = [[II, JJ], KK]
         return Dup, Dum, Dvp, Dvm
 
+    def sort_linear_index(self, sortDim, sortOrder):
+        npix = self.I.shape[2]
+        W_idx = np.zeros(self.I.shape)
+        indices = np.array([1, 2, 3, 4, 5])
+        W_idx[:, indices, :] = 1
+
+        for ch in range(self.nchannels):
+            for i in range(npix):
+                if (sortOrder == "descend"):
+                    W_idx[ch, :, i] = W_idx[ch, :, i][7 -
+                                                      np.argsort(-self.I[ch, :, i])]
+                else:
+                    W_idx[ch, :, i] = W_idx[ch, :,
+                                            i][np.argsort(self.I[ch, :, i])]
+
+        return W_idx
+
     def phi_fcn(self, x):
         if(self.estimator == 'LS'):
             return x * x
@@ -222,7 +264,7 @@ class Near_Ps(object):
             return 1 * np.ones(x.shape)
 
     def t_fcn(self, Dir, mu, u_tilde, v_tilde):
-        npix = len(self.z)
+        npix = len(z)
         # Current mesh
         exp_z = np.exp(z)
         XYZ = np.vstack((exp_z * seu_tilde, exp_z * v_tilde, exp_z))
@@ -256,18 +298,6 @@ class Near_Ps(object):
                                           da_field) + (da_field) * (self.S[1])
         grad_t[0] = (-exp_z) * (a_field + da_field) + (da_field) * (self.S[2])
         return T_field, grad_t
-
-    def sort_linear_index(sef, A, sortDim, sortOrder):
-        sizeA = A.shape
-        if (sortOrder == "descend"):
-            sortIndex = -np.argsort(-A, axis=sortDim)
-
-        else:
-            sortIndex = np.argsort(A, axis=sortDim)
-        print sortIndex
-        return sortIndex
-
-        # print np.sort(A,axis = sortDim)
 
 
 if __name__ == "__main__":
