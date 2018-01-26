@@ -4,6 +4,7 @@
 import cv2
 from numpy import *
 from scipy.sparse import csr_matrix
+from scipy.sparse import lil_matrix
 import numpy.matlib as matlib
 import gc
 
@@ -176,12 +177,15 @@ class Near_Ps(object):
         Dy = Dyp
         no_bottom = where(~Omega[0])
         no_bottom = index_matrix[no_bottom][nonzero(index_matrix[no_bottom])].astype('int32')
-        print Dy
-        # Dy[no_bottom,:] = Dym[no_bottom, :]
+        # Dy[:,no_bottom] = Dym[:,no_bottom]
+        # Dy.toarray()
+        # print array(no_bottom)
+        # Dym.toarray()
+
         #
-        # Dx = Dxp
-        # no_right = where(~Omega[2])
-        # no_right = index_matrix[no_right][nonzero(index_matrix[no_right])]
+        Dx = Dxp
+        no_right = where(~Omega[2])
+        no_right = index_matrix[no_right][nonzero(index_matrix[no_right])]
         # Dx[no_right.astype('int32')] = Dxm[no_right.astype('int32'), :]
         #
         # return Dx, Dy
@@ -218,7 +222,9 @@ class Near_Ps(object):
         JJ = hstack((JJ, indices_centre))
         KK = hstack((KK, -KK))
 
-        Dvp = csr_matrix((KK,(II,JJ)),shape=(len(imask[0]),len(imask[0])))
+        # Dvp = csr_matrix((KK,(II,JJ)),shape=(len(imask[0]),len(imask[0])))
+        Dvp = lil_matrix((len(imask[0]),len(imask[0])))
+        Dvp[II,JJ]=KK
 
         # When there is a neighbor on the left : backword differences
         idx_c = where(Omega[3] > 0)
