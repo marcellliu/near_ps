@@ -14,7 +14,7 @@ class Near_Ps(object):
 
     def __init__(self):
         super(Near_Ps, self).__init__()
-        self.mask = ones((800, 800), dtype=bool)
+        self.mask = ones((100, 100), dtype=bool)
         self.S = array([[-219.439438509374, -57.9176650067909, 517.009286741167],
                         [-206.718243107626, -185.996118240189, 402.103795661335],
                         [-218.391677320354, 46.7271522090837, 397.549748171286],
@@ -177,16 +177,13 @@ class Near_Ps(object):
         Dy = Dyp
         no_bottom = where(~Omega[0])
         no_bottom = index_matrix[no_bottom][nonzero(index_matrix[no_bottom])].astype('int32')
-        # Dy[:,no_bottom] = Dym[:,no_bottom]
-        # Dy.toarray()
-        # print array(no_bottom)
-        # Dym.toarray()
-
+        Dy[no_bottom,:] = Dym[no_bottom,:]
+        # print Dy[[0,1,2,3]]
         #
         Dx = Dxp
         no_right = where(~Omega[2])
         no_right = index_matrix[no_right][nonzero(index_matrix[no_right])]
-        # Dx[no_right.astype('int32')] = Dxm[no_right.astype('int32'), :]
+        Dx[no_right,:] = Dxm[no_right, :]
         #
         # return Dx, Dy
 
@@ -237,7 +234,8 @@ class Near_Ps(object):
         JJ = hstack((JJ, indices_centre))
         KK = hstack((KK, -KK))
 
-        Dvm = csr_matrix((KK,(II,JJ)),shape=(len(imask[0]),len(imask[0])))
+        Dvm = lil_matrix((len(imask[0]),len(imask[0])))
+        Dvm[II,JJ]=KK
 
         # When there is a neighbor on the bottom : forward differences
         idx_c = where(Omega[0] > 0)
@@ -250,7 +248,8 @@ class Near_Ps(object):
         JJ = hstack((JJ, indices_centre))
         KK = hstack([KK, -KK])
 
-        Dup = csr_matrix((KK,(II,JJ)),shape=(len(imask[0]),len(imask[0])))
+        Dup = lil_matrix((len(imask[0]),len(imask[0])))
+        Dup[II,JJ]=KK
 
         # When there is a neighbor on the top : backword differences
         idx_c = where(Omega[1] > 0)
@@ -263,7 +262,8 @@ class Near_Ps(object):
         JJ = hstack((JJ, indices_centre))
         KK = hstack([KK, -KK])
 
-        Dum = csr_matrix((KK,(II,JJ)),shape=(len(imask[0]),len(imask[0])))
+        Dum = lil_matrix((len(imask[0]),len(imask[0])))
+        Dum[II,JJ]=KK
 
         Omega = array(Omega)
         Omega.astype(bool)
