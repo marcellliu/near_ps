@@ -55,7 +55,7 @@ class Near_Ps(object):
         self.fy = 0
         self.x0 = 0
         self.y0 = 0
-        self.z = ones((10, 10)) * 700
+        self.z = ones((self.nrows, self.ncols)) * 700
         self.npix = 0
 
         self.S = mat(self.S)
@@ -65,15 +65,15 @@ class Near_Ps(object):
         self.mu = mat(self.mu).T
 
     def main_function(self):
-        # Intrinsics
+        ## Intrinsics
         self.fx = self.K[0, 0]
         self.fy = self.K[1, 1]
         self.x0 = self.K[0, 2]
         self.y0 = self.K[1, 2]
 
-        # Dx, Dy =
-        self.make_gradient()
-        # Divide images by lighting intensities and normalize to [0,1]
+        Dx, Dy = self.make_gradient()
+
+        ## Divide images by lighting intensities and normalize to [0,1]
         if(self.nchannels == 1):
             for i in range(self.nimgs):
                 self.I[i] = self.I[i] / self.Phi[i, 0]
@@ -86,14 +86,14 @@ class Near_Ps(object):
 
         max_I = amax(self.I)
         self.I = self.I / max_I
-        # Scaled pixel units
+        ## Scaled pixel units
         uu, vv = meshgrid(range(self.ncols), range(self.nrows))
         u_tilde = (uu - self.x0)
         v_tilde = (vv - self.y0)
         del self.x0, self.y0, uu, vv
         gc.collect()
 
-        # # Use a bounding box
+        ## Use a bounding box
         imask = where(self.mask > 0)
         imin = min(imask[0])
         imax = max(imask[0])
@@ -110,60 +110,60 @@ class Near_Ps(object):
         self.ncols = self.mask.shape[1]
         del imin, imax, jmin, jmax
         gc.collect()
-        #
-        # # Some useful variables
-        # px_rep = matlib.repmat(u_tilde[imask], self.nimgs, 1).T
-        # py_rep = matlib.repmat(v_tilde[imask], self.nimgs, 1).T
-        # Dx_rep = matlib.repmat(Dx, self.nimgs, 1)
-        # Dy_rep = matlib.repmat(Dy, self.nimgs, 1)
-        #
-        # # Vectorize data
-        # self.I = self.I[:, :, imask[0], imask[1]]
-        # self.I = self.I.reshape(
-        #     (self.nimgs, self.nchannels, -1))
-        # self.I = swapaxes(self.I, 0, 1)
-        #
-        # # Sort images to remove shadows and highlights
-        # W_idx = self.sort_linear_index(1, "descend")
 
-        #########################################
-        # Initialize variables
-        # self.z[self.mask == 0] = nan
-        # z_tilde = (log(self.z[imask]))
-        # rho = ones([self.nrows, self.ncols, self.nchannels]) / max_I
-        # XYZ = array([[self.z * u_tilde], [self.z * v_tilde], [self.z]])
-        # zx = Dx * mat(z_tilde).T
-        # zy = Dy * mat(z_tilde).T
-        # Nx = zeros([self.nrows, self.ncols])
-        # Ny = zeros([self.nrows, self.ncols])
-        # Nz = zeros([self.nrows, self.ncols])
-        # Nx[imask] = self.fx * zx.T
-        # Ny[imask] = self.fy * zy.T
-        # Nz[imask] = -u_tilde[imask] * zx - v_tilde[imask] * zy - 1
-        # dz = sqrt(Nx * Nx + Ny * Ny + Nz * Nz)
-        # N = [Nx / dz, Ny / dz, Nz / dz]
-        # if(self.nchannels == 1):
-        #     rho_tilde = dz.reshape((self.nrows, self.ncols, self.nchannels))
-        # else:
-        #     rho_tilde = array([[dz.T], [dz.T], [dz.T]]).reshape(
-        #         (self.nrows, self.ncols, self.nchannels))
-        # rho_tilde = (rho / rho_tilde).reshape((self.nrows *
-        #                                        self.ncols, self.nchannels))
-        # rho_tilde = rho_tilde[imask[0] * self.ncols + imask[1], :]
-        # tab_nrj = array([])
+        ## Some useful variables
+        px_rep = matlib.repmat(u_tilde[imask], self.nimgs, 1).T
+        py_rep = matlib.repmat(v_tilde[imask], self.nimgs, 1).T
+        Dx_rep = matlib.repmat(Dx, self.nimgs, 1)
+        Dy_rep = matlib.repmat(Dy, self.nimgs, 1)
+
+        ## Vectorize data
+        self.I = self.I[:, :, imask[0], imask[1]]
+        self.I = self.I.reshape(
+            (self.nimgs, self.nchannels, -1))
+        self.I = swapaxes(self.I, 0, 1)
+
+        ## Sort images to remove shadows and highlights
+        W_idx = self.sort_linear_index(1, "descend")
 
         ########################################
-        # Initial energy
-        # energy = 0
-        # Tz, grad_Tz = self.t_fcn(
-        #     z_tilde, u_tilde[imask] / self.fx, v_tilde[imask] / self.fy)
-        # psi = self.shading_fcn(z_tilde, Tz, px_rep, py_rep, Dx_rep, Dy_rep)
-        # psi = psi.reshape((self.npix, self.nimgs))
-        # for ch in range(self.nchannels):
-        #     Ich = self.I[ch]
-        #     Wch_idx = W_idx[ch]
-        #     energy = energy
-        #     self.J_fcn(rho_tilde[:, ch], multiply(Wch_idx,(psi.T)), multiply(Wch_idx,(Ich)))
+        ## Initialize variables
+        self.z[self.mask == 0] = nan
+        z_tilde = (log(self.z[imask]))
+        rho = ones([self.nrows, self.ncols, self.nchannels]) / max_I
+        XYZ = array([[self.z * u_tilde], [self.z * v_tilde], [self.z]])
+        zx = Dx * mat(z_tilde).T
+        zy = Dy * mat(z_tilde).T
+        Nx = zeros([self.nrows, self.ncols])
+        Ny = zeros([self.nrows, self.ncols])
+        Nz = zeros([self.nrows, self.ncols])
+        Nx[imask] = self.fx * zx.T
+        Ny[imask] = self.fy * zy.T
+        Nz[imask] = -u_tilde[imask] * zx - v_tilde[imask] * zy - 1
+        dz = sqrt(Nx * Nx + Ny * Ny + Nz * Nz)
+        N = [Nx / dz, Ny / dz, Nz / dz]
+        if(self.nchannels == 1):
+            rho_tilde = dz.reshape((self.nrows, self.ncols, self.nchannels))
+        else:
+            rho_tilde = array([[dz.T], [dz.T], [dz.T]]).reshape(
+                (self.nrows, self.ncols, self.nchannels))
+        rho_tilde = (rho / rho_tilde).reshape((self.nrows *
+                                               self.ncols, self.nchannels))
+        rho_tilde = rho_tilde[imask[0] * self.ncols + imask[1], :]
+        tab_nrj = array([])
+
+        #######################################
+        ## Initial energy
+        energy = 0
+        Tz, grad_Tz = self.t_fcn(
+            z_tilde, u_tilde[imask] / self.fx, v_tilde[imask] / self.fy)
+        psi = self.shading_fcn(z_tilde, Tz, px_rep, py_rep, Dx_rep, Dy_rep)
+        psi = psi.reshape((self.npix, self.nimgs))
+        for ch in range(self.nchannels):
+            Ich = self.I[ch]
+            Wch_idx = W_idx[ch]
+            energy = energy
+            self.J_fcn(rho_tilde[:, ch], multiply(Wch_idx,(psi.T)), multiply(Wch_idx,(Ich)))
 
     def test(self):
         # self.mask[:, 0] = 0
@@ -178,14 +178,13 @@ class Near_Ps(object):
         no_bottom = where(~Omega[0])
         no_bottom = index_matrix[no_bottom][nonzero(index_matrix[no_bottom])].astype('int32')
         Dy[no_bottom,:] = Dym[no_bottom,:]
-        # print Dy[[0,1,2,3]]
-        #
+
         Dx = Dxp
         no_right = where(~Omega[2])
         no_right = index_matrix[no_right][nonzero(index_matrix[no_right])]
         Dx[no_right,:] = Dxm[no_right, :]
-        #
-        # return Dx, Dy
+
+        return Dx, Dy
 
     def graddient_operators(self):
         self.nrows = self.mask.shape[0]
@@ -343,7 +342,7 @@ class Near_Ps(object):
         resz = tz[:, :, 2].reshape(-1)
 
         res = (resx + resy) * mat(z).T - mat(resz).T
-        res = array(res)
+        
         return res
 
     def r_fcn(self, rho, shadz, II):
