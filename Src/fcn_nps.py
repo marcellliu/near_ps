@@ -1,15 +1,17 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding:utf-8 -*-
 
 import json
 import os
 import sys
 import logging
-from near_ps import Near_Ps
+from near_ps_0_0_1 import Near_Ps
 from numpy import *
-import cv2
 import matplotlib.image as mpimg
-import matplotlib.pyplot as plt
+import vispy.scene
+from vispy.scene import visuals
+from PIL import Image
+# import Image
 
 class Fcn_NPS(object):
     """docstring for Fcn_NPS."""
@@ -28,10 +30,19 @@ class Fcn_NPS(object):
         self.load_sets()
         self.load_params()
         self.load_imgs()
-        print "start"
+        print('start')
         nps = Near_Ps(self.data,self.calib,self.params)
         XYZ = nps.main_fcn()
-        print XYZ
+        XYZ = squeeze(XYZ).T
+        XYZ = nan_to_num(XYZ)
+        canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
+        view = canvas.central_widget.add_view()
+        # create scatter object and fill in the data
+        scatter = visuals.Markers()
+        scatter.set_data(XYZ, edge_color=None, face_color=(1, 1, 1, .5), size=3)
+        view.add(scatter)
+        axis = visuals.XYZAxis(parent=view.scene)
+        view.camera = 'turntable'  # or try 'arcball'
 
     def load_sets(self):
         f = open(self.sets_file,'r')
@@ -52,7 +63,7 @@ class Fcn_NPS(object):
         self.params['maxit'] = 100
         self.params['estimator'] = 'LS'
         self.params['indices'] = arange(1,self.nimgs-2)
-        self.params['ratio'] = 300
+        self.params['ratio'] = 10
         self.params['self_shadows'] = 0
         self.params['display'] = 0
 
@@ -75,17 +86,15 @@ class Fcn_NPS(object):
         yy = yy - self.calib['K'][1,2]
         ff = (self.calib['K'][0,0]+self.calib['K'][1,1])/2
         cos4a = pow((ff/sqrt(xx*xx+yy*yy+ff*ff)),4)
-        I = zeros((self.nimgs,self.nchannels,self.nrows,self.ncols))
-
+        I = zeros((self.nrows,self.ncols,self.nchannels,self.nimgs))
         for i in range(0,self.nimgs):
             Ii = mpimg.imread(self.img_folder+'/photometric_sample_raw_%04d.png'%(i+1))
             for ch in range(self.nchannels):
-                Ii[:,:,ch] = (Ii[:,:,ch]-Iamb[:,:,ch])/cos4a
-                I[i,ch] = Ii[:,:,ch]
+                Ii[:,:,ch] = (Ii-Iamb)[:,:,ch]/cos4a
+                I[:,:,ch,i] = Ii[:,:,ch]
         I[I<0]=0
-
         self.nchannels = 1
-        I = mean(I,1).reshape(self.nimgs,self.nchannels,self.nrows,self.ncols)
+        I = mean(I,2).reshape(self.nrows,self.ncols,self.nchannels,self.nimgs)
         mask = mean(mask,2)
 
         self.data = {}
@@ -97,4 +106,7 @@ class Fcn_NPS(object):
         self.data['nimgs'] = self.nimgs
 
 if __name__ == "__main__":
-    a = Fcn_NPS("./Example_Img/Buddha")
+    import sys
+    if sys.flags.interactive != 1:
+        a = Fcn_NPS("./Example_Img/Buddha")
+        vispy.app.run()
