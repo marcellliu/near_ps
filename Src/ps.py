@@ -4,11 +4,10 @@
 from numpy import *
 from scipy.sparse import coo_matrix
 from scipy.sparse import spdiags
-from sksparse.cholmod import cholesky
+from scipy.sparse.linalg import splu
 import numpy.matlib as matlib
-import gc
 
-class Near_Ps(object):
+class ps(object):
     '''
     parameter:
     I: nrows*ncols*nchannels*nimgs
@@ -18,7 +17,7 @@ class Near_Ps(object):
     '''
 
     def __init__(self,data,calib,params):
-        super(Near_Ps, self).__init__()
+        super(ps, self).__init__()
         self.mask      = data['mask']
         self.I         = data['I']
         self.nimgs     = data['nimgs']
@@ -67,7 +66,7 @@ class Near_Ps(object):
             for ch in range(self.nchannels):
                 self.I[:,:,ch,i] = self.I[:,:,ch,i] / self.Phi[i, ch]
 
-        max_I = 1.193964e-05
+        max_I = amax(self.I)
         self.I = self.I / amax(self.I)
 
         # Scaled pixel units
@@ -189,10 +188,9 @@ class Near_Ps(object):
             M = (A.T)*spdiags(D.T.reshape(-1),0,self.nimgs*self.npix*self.nchannels,self.nimgs*self.npix*self.nchannels)*A
             rhs = matlib.repmat(chi,1,self.nchannels)*rho_rep*(rho_rep*(-matlib.repmat(psi,1,self.nchannels))+self.I.reshape(self.npix,self.nimgs*self.nchannels))*w
             rhs = mat((A.T)*rhs.T.reshape(-1)).T
-            if(it%5 == 1):
-                precond = cholesky(M.tocsc())
-            precond.cholesky_inplace(M)
-            z_tilde = array(z_tilde+precond.solve_A(rhs).T).reshape(-1)
+            if(it % 5 == 1):
+                precond = splu(M.tocsc())
+            z_tilde = array(z_tilde+precond.solve(rhs).T).reshape(-1)
 
             # Auxiliary variables
             self.z[imask] = exp(z_tilde)
@@ -224,7 +222,7 @@ class Near_Ps(object):
 
             if(relative_diff<self.tol):
                 break
-        return XYZ
+        return XYZ,N 
     def make_gradient(self):
         Dyp, Dym, Dxp, Dxm, Omega, index_matrix = self.graddient_operators()
 
@@ -343,7 +341,7 @@ class Near_Ps(object):
         elif(self.estimator == 'Welsh'):
             return self.lambda_ * self.lambda_ * (1 - exp(-x * x / self.lambda_ * self.lambda_))
         elif(self.estimator == 'Tukey'):
-            return (abs(x) <= self.lambda_) * (1 - pow(1 - x * x / (self.lambda_ * self.lambda_), 3)) * self.lambda_ * self.lambda_ + (asb(x) < self.lambda_) * (self.lambda_ * self.lambda_)
+            return (abs(x) <= self.lambda_) * (1 - pow(1 - x * x / (self.lambda_ * self.lambda_), 3)) * self.lambda_ * self.lambda_ + (abs(x) < self.lambda_) * (self.lambda_ * self.lambda_)
 
     def w_fcn(self, x):
         if(self.estimator == 'LS'):

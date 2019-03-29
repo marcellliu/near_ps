@@ -31,22 +31,7 @@ class Fcn_NPS(object):
         self.load_params()
         self.load_imgs()
         print('start')
-        nps = ps(self.data,self.calib,self.params)
-        XYZ,N = nps.main_fcn()
-        XYZ[0,:] = XYZ[0,:]-sum(XYZ[0,:])/XYZ.shape[2]
-        XYZ[1,:] = XYZ[1,:]-sum(XYZ[1,:])/XYZ.shape[2]
-        XYZ[2,:] = XYZ[2,:]-sum(XYZ[2,:])/XYZ.shape[2]
-        XYZ = squeeze(XYZ).T
-        XYZ = nan_to_num(XYZ)
-    
-        canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
-        view = canvas.central_widget.add_view()
-        # create scatter object and fill in the data
-        scatter = visuals.Markers()
-        scatter.set_data(XYZ, edge_color=(1,1,1), face_color=(1, 1, 1, .5), size=3)
-        view.add(scatter)
-        axis = visuals.XYZAxis(parent=view.scene)
-        view.camera = 'arcball'  # or try 'arcball'
+       
 
     def load_sets(self):
         f = open(self.sets_file,'r')
