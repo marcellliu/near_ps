@@ -1,12 +1,12 @@
 
-import numpy as np
-from PIL import Image
+# import numpy as np
+# from PIL import Image
 
-Iamb = Image.open('./Example_Img/Buddha/photometric_sample_raw_0001.png')
-# data = array(Iamb)
-print(type(Iamb))
-in_data = np.asarray(Iamb, dtype=np.uint16)
-print(in_data)
+# Iamb = Image.open('./Example_Img/Buddha/test.tif')
+# # data = array(Iamb)
+# print(type(Iamb))
+# in_data = np.asarray(Iamb, dtype=np.uint16)
+# print(in_data)
 
 # import png
 # import numpy as np
@@ -42,3 +42,11 @@ print(in_data)
 # print(np.shape(tif16),type(tif16[0,0]))
 
 # print(tif16)
+
+# import tifffile as tiff
+# image_stack = tiff.imread('./Example_Img/Buddha/test.tif')
+# print(image_stack)
+from scipy.io import loadmat
+
+lightdata = loadmat('./Example_Img/hehe12/light.mat')  # load .mat file
+print(lightdata.keys())
