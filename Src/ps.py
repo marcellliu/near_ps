@@ -51,8 +51,7 @@ class ps(object):
         self.tol = 1e-3
 
         if (self.ratio != 0):
-            self.I = self.I[0:self.nrows:self.ratio,
-                            0:self.ncols:self.ratio, :, :]
+            self.I = self.I[0:self.nrows:self.ratio,0:self.ncols:self.ratio, :]
             self.mask = self.mask[0:self.nrows:self.ratio,
                                   0:self.ncols:self.ratio]/255
             self.z = self.z[0:self.nrows:self.ratio, 0:self.ncols:self.ratio]
@@ -70,13 +69,11 @@ class ps(object):
         Dx, Dy = self.make_gradient()
 
         # Divide images by lighting intensities and normalize to [0,1]
-        if(self.Phi.shape[1] == 1):
-            self.Phi = np.hstack((self.Phi, self.Phi, self.Phi))
         for i in range(self.nimgs):
                 self.I[:, :, i] = self.I[:, :, i] / self.Phi[i]
 
-        max_I = np.amax(self.I)
-        self.I = self.I / np.amax(self.I)
+        max_I = np.amax(self.I)+1
+        self.I = self.I / max_I
 
         # Scaled pixel units
         uu, vv = np.meshgrid(range(1, self.ncols + 1),
@@ -92,7 +89,7 @@ class ps(object):
         self.z = self.z[imin:imax + 1, jmin:jmax + 1]
         u_tilde = u_tilde[imin:imax + 1, jmin:jmax + 1]
         v_tilde = v_tilde[imin:imax + 1, jmin:jmax + 1]
-        self.I = self.I[imin:imax + 1, jmin:jmax + 1, :, :]
+        self.I = self.I[imin:imax + 1, jmin:jmax + 1, :]
         self.mask = self.mask[imin:imax + 1, jmin:jmax + 1]
         imask = np.array(np.where(self.mask.T > 0))
         imask[[0, 1]] = imask[[1, 0]]
@@ -118,8 +115,7 @@ class ps(object):
         Dy_rep = coo_matrix((data, (row, col)), shape=(
             Dy.shape[0] * self.nimgs, Dy.shape[1]))
         # Vectorize data
-        self.I = self.I[imask[0], imask[1], :, :]
-        self.I = np.swapaxes(self.I, 2, 1)
+        self.I = self.I[imask[0], imask[1], :]
         # Sort images to remove shadows and highlights
         W_idx = self.sort_linear_index(1, "descend")
 
@@ -139,10 +135,10 @@ class ps(object):
         Nx[imask] = self.fx * zx.T
         Ny[imask] = self.fy * zy.T
         Nz[imask] = -u_tilde[imask] * zx - v_tilde[imask] * zy - 1
-        dz = np.sqrt(Nx * Nx + Ny * Ny + Nz * Nz)
+        dz = np.sqrt(Nx * Nx + Ny * Ny + Nz * Nz)+1e-4
         N = [Nx / dz, Ny / dz, Nz / dz]
         rho_tilde = (rho / dz).T.reshape((self.nrows * self.ncols))
-        rho_tilde = rho_tilde[imask[0] + imask[1] * self.ncols, :]
+        rho_tilde = rho_tilde[imask[0] + imask[1] * self.ncols]
         #####################################
         # Initial energy
         energy = 0
@@ -150,10 +146,10 @@ class ps(object):
             z_tilde, u_tilde[imask] / self.fx, v_tilde[imask] / self.fy)
         psi = self.shading_fcn(z_tilde, Tz, px_rep, py_rep, Dx_rep, Dy_rep)
         psi = psi.reshape(self.nimgs, self.npix).T
-        energy += self.J_fcn(rho_tilde, np.multiply(W_idx,
-                                                    (psi)), np.multiply(W_idx, self.I))
+        energy += self.J_fcn(rho_tilde, np.multiply(W_idx,(psi)), np.multiply(W_idx, self.I))
+
         #####################################
-        # Start iteration
+        # # Start iteration
         for it in range(1, self.maxit):
             r = np.zeros((self.npix, self.nimgs))
             w = np.zeros((self.npix, self.nimgs))
@@ -162,16 +158,15 @@ class ps(object):
 
             # Pseudo-albedo update
             r = self.r_fcn(rho_tilde, psi, self.I).reshape(self.nimgs, self.npix).T
-            w = self.w_fcn(r[:, :]) * W_idx[:, :]
+            w = self.w_fcn(r) * W_idx
             denom = (w[:, :] * pow(phi_chi, 2)).sum(axis=1)
             idx_ok = np.where(denom > 0)
-            rho_tilde[idx_ok] = (
-                w[idx_ok, :] * self.I[idx_ok, :] * phi_chi[idx_ok, :]).sum(axis=2) / denom[idx_ok]
+            rho_tilde[idx_ok] = (w[idx_ok, :] * self.I[idx_ok, :] * phi_chi[idx_ok, :]).sum(axis=2) / denom[idx_ok]
 
             # log-depth update
             rho_rep = np.zeros((self.npix, self.nimgs))
             r = self.r_fcn(rho_tilde, psi, self.I).reshape(self.nimgs, self.npix).T
-            rho_rep[:, np.arange(self.nimgs) + self.nimgs] = matlib.repmat(rho_tilde, self.nimgs, 1).T
+            rho_rep = matlib.repmat(rho_tilde, self.nimgs, 1).T
             r = r.reshape(self.npix, self.nimgs)
             w = self.w_fcn(r) * W_idx.reshape(self.npix,self.nimgs)
             D = chi * pow(rho_rep, 2) * w
@@ -237,7 +232,6 @@ class ps(object):
         no_right = index_matrix[no_right][np.nonzero(
             index_matrix[no_right])].astype('int32') - 1
         Dx[no_right, :] = Dxm[no_right, :]
-        # print Dx.todense()
 
         return Dx, Dy
 
@@ -327,7 +321,7 @@ class ps(object):
     def sort_linear_index(self, sortDim, sortOrder):
         W_idx = np.zeros(self.I.shape)
         indices = np.array([1, 2, 3, 4, 5])
-        W_idx[:, indices, :] = 1
+        W_idx[:, indices] = 1
 
         sortIndex = (-self.I).argsort(1)
         sortindexq = np.unravel_index(sortIndex, self.I.shape)
@@ -392,8 +386,8 @@ class ps(object):
     def r_fcn(self, rho, shadz, II):
         II = II.T.reshape(-1)
         shadz = shadz.T.reshape(-1)
-        res = matlib.repmat(rho, 1, self.nimgs) * \
-            self.psi_fcn(shadz) - II
+        res = np.kron(np.ones((1,self.nimgs)),rho) * self.psi_fcn(shadz) - II
+        res = res.reshape(-1)
         return res
 
     def J_fcn(self, rho, shadz, II):

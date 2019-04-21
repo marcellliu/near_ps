@@ -7,7 +7,8 @@ from ps import ps
 import numpy as np
 from scipy.io import loadmat
 from PIL import Image
-# import Image
+import vispy.scene
+from vispy.scene import visuals
 
 class Fcn_NPS(object):
     """docstring for Fcn_NPS."""
@@ -17,35 +18,34 @@ class Fcn_NPS(object):
         self.nimgs = 0
         self.nrows = 0
         self.ncols = 0
-        self.nchannels = 0
         logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
         self.logger = logging.getLogger("near_ps")
         self.logger.setLevel(logging.DEBUG)
 
         self.loaddata()
-        print('start')
-        # nps = ps(self.data,self.calib,self.params)
-        # XYZ,N = nps.main_fcn()
-        # XYZ[0,:] = XYZ[0,:]-sum(XYZ[0,:])/XYZ.shape[2]
-        # XYZ[1,:] = XYZ[1,:]-sum(XYZ[1,:])/XYZ.shape[2]
-        # XYZ[2,:] = XYZ[2,:]-sum(XYZ[2,:])/XYZ.shape[2]
-        # XYZ = squeeze(XYZ).T
-        # XYZ = nan_to_num(XYZ)
-    
-        # canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
-        # view = canvas.central_widget.add_view()
-        # # create scatter object and fill in the data
-        # scatter = visuals.Markers()
-        # scatter.set_data(XYZ, edge_color=(1,1,1), face_color=(1, 1, 1, .5), size=3)
-        # view.add(scatter)
-        # axis = visuals.XYZAxis(parent=view.scene)
-        # view.camera = 'arcball'  # or try 'arcball'
+        self.logger.debug("phototmetric stereo algorithm start")
+        nps = ps(self.data,self.calib,self.params)
+        X, Y, Z, N = nps.main_fcn()
+        X = X-sum(X)/len(X)
+        Y = Y-sum(Y)/len(Y)
+        Z = Z-sum(Z)/len(Z)
+        XYZ = [[X],[Y],[Z]]
+        XYZ = np.squeeze(XYZ).T
+        XYZ = np.nan_to_num(XYZ)
+
+        canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
+        view = canvas.central_widget.add_view()
+        # create scatter object and fill in the data
+        scatter = visuals.Markers()
+        scatter.set_data(XYZ, edge_color=(1,1,1), face_color=(1, 1, 1, .5), size=3)
+        view.add(scatter)
+        axis = visuals.XYZAxis(parent=view.scene)
+        view.camera = 'arcball'  # or try 'arcball'
 
     def loaddata(self):
         # load calib data
         lightdata = loadmat(self.tagetfolder+'/light.mat')  # load light.mat file
         S = lightdata['S']
-        K = lightdata['K']
         Phi = lightdata['Phi']
         Dir = lightdata['Dir']
         mu = lightdata['mu']
@@ -56,18 +56,19 @@ class Fcn_NPS(object):
         self.logger.debug("calibration data loading completed")
         # load parameters setting
         self.params = {}
-        self.params['z0'] = 700
+        self.params['z0'] = 220
         self.params['maxit'] = 100
         self.params['estimator'] = 'LS' 
         self.params['indices'] = np.arange(1,self.nimgs-2)
-        self.params['ratio'] = 10
+        self.params['ratio'] = 1
         self.params['self_shadows'] = 0
         self.logger.debug("parameters setting completed")
         # load image
-        Iamb = Image.open(self.tagetfolder+'/ambient.tif')
+        Iamb = Image.open(self.tagetfolder+'/ambient.tiff')
         Iamb = np.asarray(Iamb,dtype=np.uint16)
-        mask = Image.open(self.tagetfolder+'/mask.tif')
+        mask = Image.open(self.tagetfolder+'/mask.png')
         mask = np.asarray(mask,dtype=np.uint16)
+        mask = mask[:,:,0]
         self.nrows = Iamb.shape[0]
         self.ncols = Iamb.shape[1]
 
@@ -76,13 +77,11 @@ class Fcn_NPS(object):
         yy = yy - self.calib['K'][1,2]
         ff = (self.calib['K'][0,0]+self.calib['K'][1,1])/2
         cos4a = pow((ff/np.sqrt(xx*xx+yy*yy+ff*ff)),4)
-        I = np.zeros((self.nrows,self.ncols,self.nchannels,self.nimgs))
+        I = np.zeros((self.nrows,self.ncols,self.nimgs))
         for i in range(0,self.nimgs):
-            Ii = Image.open(self.tagetfolder+'/%04d.tif'%(i+1))
+            Ii = Image.open(self.tagetfolder+'/%02d.tiff'%(i+1))
             Ii = np.asarray(Ii,dtype=np.uint16)
-            for ch in range(self.nchannels):
-                Ii[:,:,ch] = (Ii-Iamb)[:,:,ch]/cos4a
-                I[:,:,ch,i] = Ii[:,:,ch]
+            I[:,:,i] = Ii
         
         self.data = {}
         self.data['I'] = I
@@ -90,9 +89,10 @@ class Fcn_NPS(object):
         self.data['nrows'] = self.nrows
         self.data['ncols'] = self.ncols
         self.data['nimgs'] = self.nimgs
+        self.data['nchannels'] = 1
         self.logger.debug("image load completed")
 
 if __name__ == "__main__":
     if sys.flags.interactive != 1:
-        a = Fcn_NPS("./Example_Img/Buddha")
+        a = Fcn_NPS("./Example_Img/hehe12")
         vispy.app.run()
