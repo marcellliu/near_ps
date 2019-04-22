@@ -19,7 +19,7 @@ class Fcn_NPS(object):
         self.nrows = 0
         self.ncols = 0
         logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-        self.logger = logging.getLogger("near_ps")
+        self.logger = logging.getLogger("app")
         self.logger.setLevel(logging.DEBUG)
 
         self.loaddata()
@@ -37,7 +37,7 @@ class Fcn_NPS(object):
         view = canvas.central_widget.add_view()
         # create scatter object and fill in the data
         scatter = visuals.Markers()
-        scatter.set_data(XYZ, edge_color=(1,1,1), face_color=(1, 1, 1, .5), size=3)
+        scatter.set_data(XYZ, edge_color=(1,1,1), face_color=(1, 1, 1, 1), size=3)
         view.add(scatter)
         axis = visuals.XYZAxis(parent=view.scene)
         view.camera = 'arcball'  # or try 'arcball'
@@ -59,7 +59,7 @@ class Fcn_NPS(object):
         self.params['z0'] = 220
         self.params['maxit'] = 100
         self.params['estimator'] = 'LS' 
-        self.params['indices'] = np.arange(1,self.nimgs-2)
+        self.params['indices'] = np.arange(3,self.nimgs-2)
         self.params['ratio'] = 1
         self.params['self_shadows'] = 0
         self.logger.debug("parameters setting completed")

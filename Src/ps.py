@@ -4,7 +4,7 @@ import numpy.matlib as matlib
 from scipy.sparse import coo_matrix
 from scipy.sparse import spdiags
 from scipy.sparse.linalg import splu
-
+import logging
 
 class ps(object):
     '''
@@ -43,8 +43,13 @@ class ps(object):
         self.ratio = params['ratio']
         self.maxit = params['maxit']
         self.estimator = params['estimator']
+        self.indices = params['indices']
         self.lambda_ = 0
         self.shadows = True
+
+        logging.basicConfig(level = logging.INFO,format = '%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+        self.logger = logging.getLogger("near_ps")
+        self.logger.setLevel(logging.DEBUG)
 
         self.z = np.ones((self.nrows, self.ncols)) * self.z0
         self.semi_calibrated = 0
@@ -210,12 +215,10 @@ class ps(object):
             energy_new += self.J_fcn(rho_tilde, np.multiply(W_idx,psi), np.multiply(W_idx, self.I))
             relative_diff = abs(energy_new-energy)/energy_new
             energy = energy_new
-            print(it)
-            print(energy)
-            print(relative_diff)
-
+            self.logger.debug("in ietration:%s, engergy:%s, relative difference:%s"%(it,energy,relative_diff))
             if(relative_diff < self.tol):
                 break
+        self.logger.debug("calculation is done")
         return X, Y, Z, N
 
     def make_gradient(self):
@@ -320,8 +323,7 @@ class ps(object):
 
     def sort_linear_index(self, sortDim, sortOrder):
         W_idx = np.zeros(self.I.shape)
-        indices = np.array([1, 2, 3, 4, 5])
-        W_idx[:, indices] = 1
+        W_idx[:, self.indices] = 1
 
         sortIndex = (-self.I).argsort(1)
         sortindexq = np.unravel_index(sortIndex, self.I.shape)
