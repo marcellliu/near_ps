@@ -142,8 +142,8 @@ class ps(object):
         Nz[imask] = -u_tilde[imask] * zx - v_tilde[imask] * zy - 1
         dz = np.sqrt(Nx * Nx + Ny * Ny + Nz * Nz)+1e-4
         N = [Nx / dz, Ny / dz, Nz / dz]
-        rho_tilde = (rho / dz).T.reshape((self.nrows * self.ncols))
-        rho_tilde = rho_tilde[imask[0] + imask[1] * self.ncols]
+        rho_tilde = (rho / dz).T.reshape(-1)
+        rho_tilde = rho_tilde[imask[0] + imask[1] * self.nrows]
         #####################################
         # Initial energy
         energy = 0
@@ -222,36 +222,21 @@ class ps(object):
         return X, Y, Z, N
 
     def make_gradient(self):
-        Dyp, Dym, Dxp, Dxm, Omega, index_matrix = self.graddient_operators()
-
-        Dy = Dyp
-        no_bottom = np.where(~Omega[0])
-        no_bottom = index_matrix[no_bottom][np.nonzero(
-            index_matrix[no_bottom])].astype('int32') - 1
-        Dy[no_bottom, :] = Dym[no_bottom, :]
-
-        Dx = Dxp
-        no_right = np.where(~Omega[2])
-        no_right = index_matrix[no_right][np.nonzero(
-            index_matrix[no_right])].astype('int32') - 1
-        Dx[no_right, :] = Dxm[no_right, :]
-
-        return Dx, Dy
-
-    def graddient_operators(self):
         self.nrows = self.mask.shape[0]
         self.ncols = self.mask.shape[1]
         Omega_padded = np.pad(self.mask, 1, 'constant')
 
-        Omega = [0] * 4
         # Pixels who have bottom neighbor in mask
-        Omega[0] = np.multiply(self.mask, Omega_padded[2:, 1:-1]).astype(bool)
+        Omega0 = np.multiply(self.mask, Omega_padded[2:, 1:-1])
         # Pixels who have top neighbor in mask
-        Omega[1] = np.multiply(self.mask, Omega_padded[:-2, 1:-1]).astype(bool)
+        Omega1 = np.multiply(self.mask, Omega_padded[:-2, 1:-1])
         # Pixels who have right neighbor in mask
-        Omega[2] = np.multiply(self.mask, Omega_padded[1:-1, 2:]).astype(bool)
+        Omega2 = np.multiply(self.mask, Omega_padded[1:-1, 2:])
         # Pixels who have left neighbor in mask
-        Omega[3] = np.multiply(self.mask, Omega_padded[1:-1, :-2]).astype(bool)
+        Omega3 = np.multiply(self.mask, Omega_padded[1:-1, :-2])
+        
+        Omega1 = Omega1-Omega0
+        Omega3 = Omega3-Omega2
 
         imask = np.where(self.mask.T > 0)
         index_matrix = np.zeros([self.nrows, self.ncols]).T
@@ -260,10 +245,9 @@ class ps(object):
 
         # Dv matrix
         # When there is a neighbor on the right : forward differences
-        idx_c = np.where(Omega[2] > 0)
-        indices_centre = index_matrix[idx_c].astype('int32') - 1
-        indices_right = index_matrix[(
-            idx_c[0], idx_c[1] + 1)].astype('int32') - 1
+        idx_c = np.where(Omega2 > 0)
+        indices_centre = index_matrix[idx_c] - 1
+        indices_right = index_matrix[(idx_c[0], idx_c[1] + 1)] - 1
         II = indices_centre
         JJ = indices_right
         KK = np.ones(len(indices_centre))
@@ -275,10 +259,9 @@ class ps(object):
             len(imask[0]), len(imask[0]))).tolil()
 
         # When there is a neighbor on the left : backword differences
-        idx_c = np.where(Omega[3] > 0)
-        indices_centre = index_matrix[idx_c].astype('int32') - 1
-        indices_right = index_matrix[(
-            idx_c[0], idx_c[1] - 1)].astype('int32') - 1
+        idx_c = np.where(Omega3 > 0)
+        indices_centre = index_matrix[idx_c] - 1
+        indices_right = index_matrix[(idx_c[0], idx_c[1] - 1)] - 1
         II = indices_centre
         JJ = indices_right
         KK = -np.ones([len(indices_centre)])
@@ -290,7 +273,7 @@ class ps(object):
             len(imask[0]), len(imask[0]))).tolil()
 
         # When there is a neighbor on the bottom : forward differences
-        idx_c = np.where(Omega[0] > 0)
+        idx_c = np.where(Omega0 > 0)
         indices_centre = index_matrix[idx_c].astype('int32') - 1
         indices_right = index_matrix[(
             idx_c[0] + 1, idx_c[1])].astype('int32') - 1
@@ -305,7 +288,7 @@ class ps(object):
             len(imask[0]), len(imask[0]))).tolil()
 
         # When there is a neighbor on the top : backword differences
-        idx_c = np.where(Omega[1] > 0)
+        idx_c = np.where(Omega1 > 0)
         indices_centre = index_matrix[idx_c].astype('int32') - 1
         indices_right = index_matrix[(
             idx_c[0] - 1, idx_c[1])].astype('int32') - 1
@@ -319,7 +302,10 @@ class ps(object):
         Dum = coo_matrix((KK, (II, JJ)), shape=(
             len(imask[0]), len(imask[0]))).tolil()
 
-        return Dup, Dum, Dvp, Dvm, Omega, index_matrix
+        Dx = Dvp+Dvm
+        Dy = Dup+Dum
+        
+        return Dx, Dy
 
     def sort_linear_index(self, sortDim, sortOrder):
         W_idx = np.zeros(self.I.shape)

@@ -56,11 +56,11 @@ class Fcn_NPS(object):
         self.logger.debug("calibration data loading completed")
         # load parameters setting
         self.params = {}
-        self.params['z0'] = 220
+        self.params['z0'] = 230
         self.params['maxit'] = 100
         self.params['estimator'] = 'LS' 
-        self.params['indices'] = np.arange(3,self.nimgs-2)
-        self.params['ratio'] = 1
+        self.params['indices'] = np.arange(1,self.nimgs-3)
+        self.params['ratio'] = 10
         self.params['self_shadows'] = 0
         self.logger.debug("parameters setting completed")
         # load image
@@ -89,10 +89,9 @@ class Fcn_NPS(object):
         self.data['nrows'] = self.nrows
         self.data['ncols'] = self.ncols
         self.data['nimgs'] = self.nimgs
-        self.data['nchannels'] = 1
         self.logger.debug("image load completed")
 
 if __name__ == "__main__":
     if sys.flags.interactive != 1:
-        a = Fcn_NPS("./Example_Img/hehe12")
+        a = Fcn_NPS("./Example_Img/object1")
         vispy.app.run()
