@@ -3,12 +3,13 @@
 import os
 import sys
 import logging
-from ps import ps
+from PS import ps
 import numpy as np
 from scipy.io import loadmat
 from PIL import Image
-import vispy.scene
-from vispy.scene import visuals
+import OpenGL.GL as gl
+import OpenGL.GLU as glu
+import OpenGL.GLUT as glut
 
 class Fcn_NPS(object):
     """docstring for Fcn_NPS."""
@@ -26,21 +27,22 @@ class Fcn_NPS(object):
         self.logger.debug("phototmetric stereo algorithm start")
         nps = ps(self.data,self.calib,self.params)
         X, Y, Z, N = nps.main_fcn()
-        X = X-sum(X)/len(X)
-        Y = Y-sum(Y)/len(Y)
-        Z = Z-sum(Z)/len(Z)
-        XYZ = [[X],[Y],[Z]]
-        XYZ = np.squeeze(XYZ).T
-        XYZ = np.nan_to_num(XYZ)
+    
+        # X = X-sum(X)/len(X)
+        # Y = Y-sum(Y)/len(Y)
+        # Z = Z-sum(Z)/len(Z)
+        # XYZ = [[X],[Y],[Z]]
+        # XYZ = np.squeeze(XYZ).T
+        # XYZ = np.nan_to_num(XYZ)
 
-        canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
-        view = canvas.central_widget.add_view()
-        # create scatter object and fill in the data
-        scatter = visuals.Markers()
-        scatter.set_data(XYZ, edge_color=(1,1,1), face_color=(1, 1, 1, 1), size=3)
-        view.add(scatter)
-        axis = visuals.XYZAxis(parent=view.scene)
-        view.camera = 'arcball'  # or try 'arcball'
+        # canvas = vispy.scene.SceneCanvas(keys='interactive', show=True)
+        # view = canvas.central_widget.add_view()
+        # # create scatter object and fill in the data
+        # scatter = visuals.Markers()
+        # scatter.set_data(XYZ, edge_color=(1,1,1), face_color=(1, 1, 1, 1), size=3)
+        # view.add(scatter)
+        # axis = visuals.XYZAxis(parent=view.scene)
+        # view.camera = 'arcball'  # or try 'arcball'
 
     def loaddata(self):
         # load calib data
@@ -57,10 +59,10 @@ class Fcn_NPS(object):
         # load parameters setting
         self.params = {}
         self.params['z0'] = 230
-        self.params['maxit'] = 100
+        self.params['maxit'] = 200
         self.params['estimator'] = 'LS' 
         self.params['indices'] = np.arange(1,self.nimgs-3)
-        self.params['ratio'] = 10
+        self.params['ratio'] = 5
         self.params['self_shadows'] = 0
         self.logger.debug("parameters setting completed")
         # load image
@@ -93,5 +95,5 @@ class Fcn_NPS(object):
 
 if __name__ == "__main__":
     if sys.flags.interactive != 1:
-        a = Fcn_NPS("./Example_Img/object1")
+        a = Fcn_NPS("./Example_Img/paper")
         vispy.app.run()
